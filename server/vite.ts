@@ -67,19 +67,27 @@ export async function setupVite(app: Express, server: Server) {
   });
 }
 
+// In server/vite.ts
+
 export function serveStatic(app: Express) {
-  const distPath = path.resolve(import.meta.dirname, "public");
+  // process.cwd() gives the project's root directory. This is more reliable.
+  const root = process.cwd();
+  
+  // Construct the absolute path to your frontend's build output.
+  const distPath = path.join(root, 'dist', 'public');
 
   if (!fs.existsSync(distPath)) {
     throw new Error(
-      `Could not find the build directory: ${distPath}, make sure to build the client first`,
+      `Could not find the build directory: ${distPath}. Make sure the frontend has been built.`,
     );
   }
 
+  // 1. Serve static assets (JS, CSS, images) from the dist/public folder
   app.use(express.static(distPath));
 
-  // fall through to index.html if the file doesn't exist
-  app.use("*", (_req, res) => {
+  // 2. For any other request, serve the index.html file as a fallback.
+  // This is crucial for single-page applications (SPAs) like React.
+  app.get("*", (_req, res) => {
     res.sendFile(path.resolve(distPath, "index.html"));
   });
 }

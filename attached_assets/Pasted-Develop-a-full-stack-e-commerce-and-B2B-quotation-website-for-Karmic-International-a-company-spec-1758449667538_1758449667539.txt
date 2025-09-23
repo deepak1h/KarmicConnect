@@ -1,0 +1,65 @@
+Develop a full-stack e-commerce and B2B quotation website for 'Karmic International,' a company specializing in the export of yarn and other textile products.
+I. Website Structure & Navigation:
+Homepage: Modern, clean design showcasing Karmic International's brand and core offerings. Include a prominent 'About Us' section, 'Contact Us,' and clear navigation to all product categories.
+Main Categories (accessible from homepage navigation):
+Garment
+Fabric
+Yarn
+Home Textiles
+Fiber & Feedstock
+II. Product Catalog & Display (for each category):
+Product Listings: Each category page should display products in a visually appealing grid or list format.
+Product Details Page: Clicking on a product should lead to a dedicated page with:
+High-resolution image gallery (multiple images per product).
+Detailed product description.
+Specifications (e.g., material, count, weight, color options).
+Pricing information:
+For some products (e.g., Home Textiles), display a direct price.
+For most products (Garment, Fabric, Yarn, Fiber & Feedstock, and certain Home Textiles), display 'Price on Request' or a clear 'Get Quote' button.
+III. Quotation System (Buyer/Seller Interaction):
+Integrated Quotation Form: Accessible from product detail pages and a dedicated 'Quotation' section in the main navigation.
+Form Fields:
+I am a (Buyer/Seller - dropdown/radio button)
+Name
+Company
+Email
+Mobile
+Country
+Profession
+Category (dropdown, pre-populated with main categories)
+Product (text field or a smart dropdown/autocomplete based on selected category)
+Message (large text area for additional details/requirements)
+Submission: Upon submission, data should be stored in a database, and an email notification sent to Karmic International's administrative email.
+Confirmation: A success message should be displayed to the user upon successful submission.
+IV. Admin Portal:
+Secure Login: A robust admin login system with username/password authentication.
+Dashboard: Simple dashboard with quick links to 'List Products' and 'See New Messages.'
+1. Product Management:
+Add New Product:
+Product Name
+Category (dropdown)
+Description (rich text editor)
+Multiple Image Upload (with drag-and-drop or batch upload functionality).
+Price (numerical input, optional)
+Option for 'Price on Request' (checkbox/radio button).
+Specifications fields (add/remove dynamic fields for custom specs).
+Edit/Delete Product: Ability to modify existing product details, images, and pricing.
+View All Products: A paginated list of all products, with search and filter options.
+2. Message/Quotation Management:
+View New Messages: Display a list of all submitted quotations/messages.
+Details View: Click to view full details of a specific message (all fields from the quotation form).
+Status Management: Ability to mark messages as 'New,' 'Processing,' and 'Completed' (dropdown or buttons).
+Search & Filter: Filter messages by status, date, category, etc.
+V. Technical Requirements & Best Practices:
+Database: Design and implement an appropriate database schema (e.g., SQL or NoSQL) to store products, categories, quotations, and admin user data.
+Responsive Design: Ensure the website is fully responsive and optimized for desktop, tablet, and mobile devices.
+SEO Friendly: Implement SEO best practices (clean URLs, meta tags, sitemap generation).
+Security: Implement security measures for user data, admin portal, and quotation submissions (e.g., input validation, secure password hashing for admin).
+Performance: Optimize for fast loading times.
+User Experience (UX): Intuitive navigation, clear calls to action, and an overall user-friendly interface.
+Image Optimization: Automatically optimize uploaded images for web display.
+VI. Visuals & Branding:
+Color Palette: Use a professional and appealing color scheme.
+Typography: Select appropriate fonts for readability and brand identity.
+Logo Integration: Prominently display the 'Karmic International' logo.
+Example Images: For initial product population, use placeholder images relevant to yarn, fabric, garments, and home textiles."

@@ -33,27 +33,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // This useEffect runs ONCE when the provider is first mounted at the top of your app.
   useEffect(() => {
     console.log("AuthProvider useEffect: Running initial localStorage check.");
+    setIsLoading(true);
 
-    const token = localStorage.getItem("adminToken");
-    const userData = localStorage.getItem("adminUser");
-    console.log("AuthProvider useEffect: Stored Token:", token ? "Found" : "Not Found");
-    console.log("AuthProvider useEffect: Stored UserData:", userData ? "Found" : "Not Found");
+const timer = setTimeout(() => {
+      console.log("AuthProvider useEffect: Deferred localStorage check running...");
+      const token = localStorage.getItem("adminToken");
+      const userData = localStorage.getItem("adminUser");
 
-    if (token && userData) {
-      try {
-        setUser(JSON.parse(userData));
-        setIsAuthenticated(true);
-        console.log("AuthProvider useEffect: Successfully authenticated with user:", JSON.parse(userData));
-      } catch (error) {
-        console.error("Error parsing user data from localStorage:", error);
-        localStorage.removeItem("adminToken");
-        localStorage.removeItem("adminUser");
-        
+      console.log("AuthProvider useEffect: Retrieved adminToken (deferred):", token ? "Found" : "Not Found");
+      console.log("AuthProvider useEffect: Retrieved adminUser (deferred):", userData ? "Found" : "Not Found");
+
+      if (token && userData) {
+        try {
+          const parsedUser = JSON.parse(userData);
+          setUser(parsedUser);
+          setIsAuthenticated(true);
+          console.log("AuthProvider useEffect: Authenticated successfully (deferred) with user:", parsedUser.username);
+        } catch (error) {
+          console.error("AuthProvider useEffect: Error parsing user data from localStorage (deferred):", error);
+          localStorage.removeItem("adminToken");
+          localStorage.removeItem("adminUser");
+          setIsAuthenticated(false);
+          setUser(null);
+        }
+      } else {
+        console.log("AuthProvider useEffect: No token or user data found (deferred). Not authenticated.");
+        setIsAuthenticated(false);
+        setUser(null);
       }
-    }
-    
-    setIsLoading(false); // Finished checking
-  }, []); // Empty dependency array ensures this runs only once for the lifetime of the app
+      setIsLoading(false); // Set isLoading to false ONLY AFTER the check is complete
+      console.log("AuthProvider useEffect: Initial authentication check complete (END). Final isAuthenticated:", isAuthenticated);
+    }, 100); // Try a 100ms delay. You can experiment with 0, 50, 100, 200.
+
+    // Cleanup function for the timer
+    return () => clearTimeout(timer);
+  }, []);
+
+  
 
   const login = useCallback((token: string, userData: AdminUser) => {
     localStorage.setItem("adminToken", token);

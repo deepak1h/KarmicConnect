@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { Lock, User } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
 
 const loginSchema = z.object({
   username: z.string().min(1, "Username is required"),
@@ -23,6 +24,19 @@ export default function AdminLogin() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
+  const {login, isAuthenticated, isLoading } = useAuth(); // Get auth state
+
+  // This useEffect will run when the component mounts and whenever isAuthenticated or isLoading changes.
+  useEffect(() => {
+    // We only want to redirect if the initial check is complete (!isLoading)
+    // and the user is confirmed to be authenticated.
+     console.log("AdminLogin useEffect: isAuthenticated is now ", isAuthenticated, "isLoading:", isLoading);
+    if (!isLoading && isAuthenticated) {
+      console.log("AdminLogin: User is already authenticated. Redirecting to dashboard.");
+      setLocation("/admin/dashboard");
+    }
+  }, [isAuthenticated, isLoading, setLocation]);
+
   const form = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
@@ -34,15 +48,22 @@ export default function AdminLogin() {
   const mutation = useMutation({
     mutationFn: async (data: LoginForm) => {
       const response = await apiRequest("POST", "/api/admin/login", data);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: "An unknown error occurred" }));
+        throw new Error(errorData.message || "Invalid credentials");
+      }
       return await response.json();
     },
     onSuccess: (data) => {
-      localStorage.setItem("adminToken", data.token);
-      localStorage.setItem("adminUser", JSON.stringify(data.admin));
+      //localStorage.setItem("adminToken", data.token);
+      //localStorage.setItem("adminUser", JSON.stringify(data.admin));
+      //console.log('Login successful. API Response data:', data); 
+      login(data.admin, data.token);
       toast({
         title: "Login Successful",
         description: "Welcome to the admin dashboard.",
       });
+      
       setLocation("/admin/dashboard");
     },
     onError: (error) => {

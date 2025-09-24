@@ -230,6 +230,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const productData = {
         ...req.body,
+        price: req.body.priceOnRequest || req.body.price === '' ? null : req.body.price, 
         specifications: req.body.specifications ? JSON.parse(req.body.specifications) : undefined,
         priceOnRequest: req.body.priceOnRequest === 'true',
         isActive: req.body.isActive === 'true'

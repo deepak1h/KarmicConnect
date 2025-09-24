@@ -71,9 +71,10 @@ const timer = setTimeout(() => {
 
   
 
-  const login = useCallback((token: string, userData: AdminUser) => {
+  const login = useCallback((userData: AdminUser, token: string,) => {
     localStorage.setItem("adminToken", token);
     localStorage.setItem("adminUser", JSON.stringify(userData));
+    //console.log('useAuth: login function CALLED with:', { userData, token });
     setUser(userData);
     setIsAuthenticated(true);
   }, []);

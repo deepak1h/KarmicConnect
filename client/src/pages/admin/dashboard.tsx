@@ -7,11 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Package, MessageSquare, User, LogOut, Plus, Eye } from "lucide-react";
 import { getAuthHeaders } from "@/lib/auth-utils";
+import { useToast } from "@/hooks/use-toast";
 
 export default function AdminDashboard() {
   const [, setLocation] = useLocation();
   const { user, isLoading, isAuthenticated, logout } = useAuth();
-
+  const { toast } = useToast();
+  
   useEffect(() => {
     console.log("AdminDashboard useEffect: isAuthenticated changed to", isAuthenticated, "isLoading:", isLoading);
     if (!isAuthenticated && !isLoading) {
@@ -54,7 +56,6 @@ export default function AdminDashboard() {
 
     // At this point, isLoading is false and isAuthenticated is true.
   console.log("AdminDashboard: Rendering full content for user:", user?.username);
-
 
   const handleLogout = () => {
     logout();

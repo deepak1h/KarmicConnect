@@ -13,8 +13,9 @@ export default function AdminDashboard() {
   const { user, isLoading, isAuthenticated, logout } = useAuth();
 
   useEffect(() => {
-    console.log("AdminDashboard useEffect: isAuthenticated changed to", isAuthenticated);
+    console.log("AdminDashboard useEffect: isAuthenticated changed to", isAuthenticated, "isLoading:", isLoading);
     if (!isAuthenticated && !isLoading) {
+      console.log("AdminDashboard: Redirecting to /admin/login because not authenticated and not loading.");
       setLocation("/admin/login");
     }
   }, [isAuthenticated, setLocation, isLoading]);

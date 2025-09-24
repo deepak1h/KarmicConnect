@@ -33,17 +33,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // This useEffect runs ONCE when the provider is first mounted at the top of your app.
   useEffect(() => {
     console.log("AuthProvider useEffect: Running initial localStorage check.");
+
     const token = localStorage.getItem("adminToken");
     const userData = localStorage.getItem("adminUser");
+    console.log("AuthProvider useEffect: Stored Token:", token ? "Found" : "Not Found");
+    console.log("AuthProvider useEffect: Stored UserData:", userData ? "Found" : "Not Found");
 
     if (token && userData) {
       try {
         setUser(JSON.parse(userData));
         setIsAuthenticated(true);
+        console.log("AuthProvider useEffect: Successfully authenticated with user:", parsedUser.username);
       } catch (error) {
         console.error("Error parsing user data from localStorage:", error);
         localStorage.removeItem("adminToken");
         localStorage.removeItem("adminUser");
+        
       }
     }
     

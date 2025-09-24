@@ -43,7 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         setUser(JSON.parse(userData));
         setIsAuthenticated(true);
-        console.log("AuthProvider useEffect: Successfully authenticated with user:", parsedUser.username);
+        console.log("AuthProvider useEffect: Successfully authenticated with user:", JSON.parse(userData));
       } catch (error) {
         console.error("Error parsing user data from localStorage:", error);
         localStorage.removeItem("adminToken");

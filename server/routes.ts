@@ -3,33 +3,46 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertQuotationSchema, insertProductSchema, insertAdminUserSchema } from "@shared/schema";
 import { sendEmail } from "./sendgrid";
-import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
+
 import multer from "multer";
 import sharp from "sharp";
-import path from "path";
+
 import fs from "fs";
 
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
+import {supabase} from "./supabaseClient";
+import { Request, Response, NextFunction } from 'express';
+import { supabaseAdmin } from './supabaseAdminClient'; // Use admin client to verify tokens
+
 
 // Setup multer for file uploads
+const BUCKET_NAME = 'karmic-images';
 const upload = multer({ dest: 'uploads/' });
 
-// Middleware to verify admin JWT
-const verifyAdmin = (req: any, res: any, next: any) => {
-  const token = req.headers.authorization?.split(' ')[1];
-  if (!token) {
-    return res.status(401).json({ message: "No token provided" });
+
+export async function verifyAdmin(req: Request, res: Response, next: NextFunction) {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ message: 'Unauthorized: No token provided.' });
   }
 
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    req.admin = decoded;
-    next();
-  } catch (error) {
-    return res.status(401).json({ message: "Invalid token" });
+  const token = authHeader.split(' ')[1];
+
+  // Ask Supabase who this token belongs to
+  const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+
+  if (error || !user) {
+    return res.status(401).json({ message: 'Unauthorized: Invalid token.' });
   }
-};
+
+  // Check the user's role from the metadata we set earlier
+  if (user.user_metadata?.role !== 'admin') {
+    return res.status(403).json({ message: 'Forbidden: User does not have admin privileges.' });
+  }
+
+  // If all is good, proceed to the protected route handler
+  next();
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
@@ -161,27 +174,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin authentication
-  app.post("/api/admin/login", async (req, res) => {
-    try {
-      const { username, password } = req.body;
-      const admin = await storage.getAdminByUsername(username);
+  // app.post("/api/admin/logins", async (req, res) => {
+  //   try {
+  //     const { username, password } = req.body;
+  //     const admin = await storage.getAdminByUsername(username);
       
-      if (!admin) {
-        return res.status(401).json({ message: "Invalid credentials" });
-      }
+  //     if (!admin) {
+  //       return res.status(401).json({ message: "Invalid credentials" });
+  //     }
 
-      const isValidPassword = await bcrypt.compare(password, admin.password);
-      if (!isValidPassword) {
-        return res.status(401).json({ message: "Invalid credentials" });
-      }
+  //     const isValidPassword = await bcrypt.compare(password, admin.password);
+  //     if (!isValidPassword) {
+  //       return res.status(401).json({ message: "Invalid credentials" });
+  //     }
 
-      const token = jwt.sign({ id: admin.id, username: admin.username }, JWT_SECRET, { expiresIn: '24h' });
-      res.json({ token, admin: { id: admin.id, username: admin.username, email: admin.email } });
-    } catch (error) {
-      console.error("Error during admin login:", error);
-      res.status(500).json({ message: "Login failed" });
+  //     const token = jwt.sign({ id: admin.id, username: admin.username }, JWT_SECRET, { expiresIn: '24h' });
+  //     res.json({ token, admin: { id: admin.id, username: admin.username, email: admin.email } });
+  //   } catch (error) {
+  //     console.error("Error during admin login:", error);
+  //     res.status(500).json({ message: "Login failed" });
+  //   }
+  // });
+
+app.post("/api/admin/login", async (req, res) => {
+  try {
+    // We now use email for login, not username
+    const { username, password } = req.body;
+
+    if (!username || !password) {
+      return res.status(400).json({ message: "Email and password are required." });
     }
-  });
+
+    // 1. Ask Supabase to sign the user in
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: username,
+      password: password,
+    });
+
+    if (error) {
+      // Supabase gives specific errors, like "Invalid login credentials"
+      return res.status(401).json({ message: error.message });
+    }
+
+    // 2. IMPORTANT: Check if the logged-in user is an admin
+    if (data.user.user_metadata?.role !== 'admin') {
+      return res.status(403).json({ message: "Forbidden: User is not an admin." });
+    }
+
+    // 3. To maintain compatibility, we format the response similarly to your old one.
+    // The client needs the 'access_token' to make authenticated requests.
+    res.json({
+      token: data.session.access_token, // This is the new JWT!
+      admin: {
+        id: data.user.id,
+        username: data.user.user_metadata.username, // Get username from metadata
+        email: data.user.email,
+      }
+    });
+    
+  } catch (error) {
+    console.error("Error during admin login:", error);
+    res.status(500).json({ message: "Login failed" });
+  }
+});
 
   // Admin protected routes
 
@@ -202,16 +257,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const processedImages = [];
         for (const file of req.files) {
           const filename = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}.webp`;
-          const outputPath = path.join('uploads', filename);
-          
-          await sharp(file.path)
-            .resize(800, 600, { fit: 'inside', withoutEnlargement: true })
-            .webp({ quality: 80 })
-            .toFile(outputPath);
-          
-          // Clean up original file
+          const processedImageBuffer = await sharp(file.path)
+                    .resize(800, 600, { fit: 'inside', withoutEnlargement: true })
+                    .webp({ quality: 80 })
+                    .toBuffer();
+
+          const { data, error: uploadError } = await supabaseAdmin.storage
+                    .from(BUCKET_NAME)
+                    .upload(filename, processedImageBuffer, {
+                        contentType: 'image/webp',
+                        upsert: false // Don't overwrite existing files
+                    });
+
+                if (uploadError) {
+                    throw new Error(`Supabase upload failed: ${uploadError.message}`);
+                }
+          const { data: { publicUrl } } = supabase.storage
+                    .from(BUCKET_NAME)
+                    .getPublicUrl(filename);
+                
+          processedImages.push(publicUrl);
           fs.unlinkSync(file.path);
-          processedImages.push(`/uploads/${filename}`);
         }
         productData.images = processedImages;
       }
@@ -236,25 +302,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isActive: req.body.isActive === 'true'
       };
 
+      const existingProduct = await storage.getProductById(req.params.id);
+        if (!existingProduct) {
+            return res.status(404).json({ message: 'Product not found' });
+        }
+      const oldImageUrls = existingProduct.images || [];
+      const newImageUrls = [];
       // Process new uploaded images if any
-      if (req.files && Array.isArray(req.files) && req.files.length > 0) {
-        const processedImages = [];
+      if (req.files && Array.isArray(req.files)) {
+        
         for (const file of req.files) {
           const filename = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}.webp`;
-          const outputPath = path.join('uploads', filename);
-          
-          await sharp(file.path)
-            .resize(800, 600, { fit: 'inside', withoutEnlargement: true })
-            .webp({ quality: 80 })
-            .toFile(outputPath);
-          
+          const processedImageBuffer = await sharp(file.path)
+                    .resize(800, 600, { fit: 'inside', withoutEnlargement: true })
+                    .webp({ quality: 80 })
+                    .toBuffer();
+
+          const { data, error: uploadError } = await supabaseAdmin.storage
+                    .from(BUCKET_NAME)
+                    .upload(filename, processedImageBuffer, {
+                        contentType: 'image/webp',
+                        upsert: false // Don't overwrite existing files
+                    });
+
+                if (uploadError) {
+                    throw new Error(`Supabase upload failed: ${uploadError.message}`);
+                }
+          const { data: { publicUrl } } = supabase.storage
+                    .from(BUCKET_NAME)
+                    .getPublicUrl(filename);
+                
+          newImageUrls.push(publicUrl);
           fs.unlinkSync(file.path);
-          processedImages.push(`/uploads/${filename}`);
         }
-        productData.images = processedImages;
+        productData.images = newImageUrls;
       }
 
       const product = await storage.updateProduct(req.params.id, productData);
+      if (newImageUrls.length > 0 && oldImageUrls.length > 0) {
+            const oldImageFileNames = oldImageUrls.map(url => url.split('/').pop());
+            const { data, error } = await supabaseAdmin.storage
+                .from(BUCKET_NAME)
+                .remove(oldImageFileNames);
+            
+            if(error) {
+                console.error("Failed to delete old images from storage:", error);
+                // This is not a critical failure, so we don't throw an error to the client
+            }
+      }
       res.json(product);
     } catch (error) {
       console.error("Error updating product:", error);
@@ -262,16 +357,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Delete product
-  app.delete("/api/admin/products/:id", verifyAdmin, async (req, res) => {
-    try {
-      await storage.deleteProduct(req.params.id);
-      res.json({ message: "Product deleted successfully" });
-    } catch (error) {
-      console.error("Error deleting product:", error);
-      res.status(500).json({ message: "Failed to delete product" });
+  //Delete Product
+app.delete("/api/admin/products/:id", verifyAdmin, async (req, res) => {
+  try {
+    const productId = req.params.id;
+
+    // STEP 1: Get the product from the database BEFORE deleting it.
+    // This is crucial to get the list of images to delete.
+    const productToDelete = await storage.getProductById(productId);
+
+    if (!productToDelete) {
+      return res.status(404).json({ message: "Product not found" });
     }
-  });
+
+    // STEP 2: If the product has images, delete them from Supabase Storage.
+    const imageUrls = productToDelete.images;
+    if (imageUrls && Array.isArray(imageUrls) && imageUrls.length > 0) {
+      
+      // Extract just the filenames from the full URLs.
+      // e.g., "https://.../my-file.webp" becomes "my-file.webp"
+      const filenames = imageUrls
+        .map(url => url.split('/').pop())
+        .filter(Boolean) as string[]; // filter(Boolean) removes any null/undefined
+
+      if (filenames.length > 0) {
+        // Use the supabaseAdmin client to remove the files
+        const { error: removeError } = await supabaseAdmin.storage
+          .from(BUCKET_NAME) // Make sure BUCKET_NAME is defined in this scope
+          .remove(filenames);
+
+        if (removeError) {
+          // Log the error, but don't stop the process.
+          // It's better to delete the database record even if the image cleanup fails.
+          console.error(
+            "Partial failure during product deletion: Could not remove images from storage.",
+            removeError
+          );
+        }
+      }
+    }
+
+    // STEP 3: Now, delete the product record from the database.
+    await storage.deleteProduct(productId);
+
+    res.json({ message: "Product deleted successfully" });
+
+  } catch (error) {
+    console.error("Error deleting product:", error);
+    res.status(500).json({ message: "Failed to delete product" });
+  }
+});
 
   // Get all quotations
   app.get("/api/admin/quotations", verifyAdmin, async (req, res) => {

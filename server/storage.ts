@@ -138,15 +138,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Admin Users
-  async getAdminByUsername(username: string): Promise<AdminUser | undefined> {
-    const [admin] = await db.select().from(adminUsers).where(eq(adminUsers.username, username));
-    return admin;
-  }
+  // async getAdminByUsername(username: string): Promise<AdminUser | undefined> {
+  //   const [admin] = await db.select().from(adminUsers).where(eq(adminUsers.username, username));
+  //   return admin;
+  // }
 
-  async createAdminUser(adminUser: InsertAdminUser): Promise<AdminUser> {
-    const [newAdmin] = await db.insert(adminUsers).values(adminUser).returning();
-    return newAdmin;
-  }
+  // async createAdminUser(adminUser: InsertAdminUser): Promise<AdminUser> {
+  //   const [newAdmin] = await db.insert(adminUsers).values(adminUser).returning();
+  //   return newAdmin;
+  // }
 }
 
 export const storage = new DatabaseStorage();
